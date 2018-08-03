@@ -1,54 +1,31 @@
-import cv2
-import numpy as np
+import os
+import tensorflow as tf
 
-# Example 1 to detect lines
-# im = cv2.imread('address-tds.jpg')
-# rows,cols = im.shape[:2]
-# imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
-# ret,thresh = cv2.threshold(imgray,125,255,0)
-# thresh = (255-thresh)
-# thresh2=thresh.copy()
-# im2, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+files = []
+files_l = []
 
-# cv2.imshow('image1',im)
-# cv2.imshow('image3',thresh2)
-# cv2.drawContours(im, contours, -1, (0,255,0), 3) #draw all contours
-# contnumber=4
-# # cv2.drawContours(im, contours, contnumber, (0,255,0), 3) #draw only contour contnumber
-# # cv2.imshow('contours', im)
-# cv2.imwrite('countours.jpg', im)
+for (path, dirnames, filenames) in os.walk('document_blanks'):
+    files.extend(os.path.join(path, name) for name in filenames)
 
-# [vx,vy,x,y] = cv2.fitLine(contours[contnumber], cv2.DIST_L2,0,0.01,0.01)
-# lefty = int((-x*vy/vx) + y)
-# righty = int(((cols-x)*vy/vx)+y)
-# cv2.line(im,(cols-1,righty),(0,lefty),(0,255,255),2)
+for x in files:
+    files_l.append('document_blanks')
 
-# cv2.imshow('result', im)
+filenames = tf.constant(files)
+labels = tf.constant(files_l)
 
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
+# step 2: create a dataset returning slices of `filenames`
+dataset = tf.data.Dataset.from_tensor_slices((filenames, labels))
 
-# sample 2
-# image = cv2.imread('address-tds.jpg')
-# gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-# edges = cv2.Canny(gray, 100, 250)
-# lines = cv2.HoughLinesP(edges, 1, np.pi/180, 25, minLineLength=100, maxLineGap=50)
+# step 3: parse every image in the dataset using `map`
+def _parse_function(filename, label):
+    image_string = tf.read_file(filename)
+    image_decoded = tf.image.decode_jpeg(image_string, channels=3)
+    image = tf.cast(image_decoded, tf.float32)
+    return image, label
 
-# hough = np.zeros(image.shape, np.uint8)
+dataset = dataset.map(_parse_function)
+dataset = dataset.batch(2)
 
-# for line in lines:
-#     x1, y1, x2, y2 = line[0]
-#     cv2.line(hough, (x1, y1), (x2, y2), (255, 255, 255), 2)
-
-# cv2.imwrite('hough.jpg', hough)
-
-gray = cv2.imread('address-tds.jpg')
-edges = cv2.Canny(gray,50,150,apertureSize = 3)
-cv2.imwrite('edges-50-150.jpg',edges)
-minLineLength=1
-lines = cv2.HoughLinesP(image=edges,rho=1,theta=np.pi/180, threshold=600,lines=np.array([]), minLineLength=minLineLength,maxLineGap=40)
-
-a,b,c = lines.shape
-for i in range(a):
-    cv2.line(gray, (lines[i][0][0], lines[i][0][1]), (lines[i][0][2], lines[i][0][3]), (0, 0, 255), 3, cv2.LINE_AA)
-    cv2.imwrite('hough.jpg',gray)
+# step 4: create iterator and final input tensor
+iterator = dataset.make_one_shot_iterator()
+images, labels = iterator.get_next()
